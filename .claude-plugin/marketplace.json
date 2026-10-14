@@ -1,0 +1,14 @@
+{
+  "name": "lecture-motion-graphics",
+  "description": "강의 영상 모션그래픽 스킬",
+  "owner": {
+    "name": "jesuswithme"
+  },
+  "plugins": [
+    {
+      "name": "lecture-motion-graphics",
+      "source": "./plugins/lecture-motion-graphics",
+      "description": "강의·발표 영상을 음성 타이밍에 맞춘 텍스트·그래픽, 하단 자막, BGM이 들어간 16:9 30fps 모션그래픽 MP4로 만드는 스킬"
+    }
+  ]
+}
