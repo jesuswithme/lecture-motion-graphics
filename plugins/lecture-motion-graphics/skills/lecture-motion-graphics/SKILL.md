@@ -19,14 +19,15 @@ description: "강의·발표 영상(얼굴 촬영 또는 컴퓨터 실습 화면
 - 레이아웃 2모드를 부드럽게 전환(ease in-out 0.55s):
   - **full**: 영상 전체화면 + 아주 느린 push-in(최대 3%) + 상단 그라데이션. 인사/이름표, 핵심 결론 문장, 마무리 "감사합니다"에 사용.
   - **card**: 같은 영상을 흐리게+남색 오버레이한 배경, 오른쪽 둥근 카드(x1050,y70,760×830, 반경30, 주황 테두리, 그림자)에 화자 크롭, 왼쪽 x≈110 열에 그래픽.
-- 배경은 사용자가 준 영상/이미지만 사용(외부 이미지 금지). 이미지가 오면 card 모드 배경이나 장면 전환에 활용.
+- 배경은 사용자가 준 영상/이미지만 사용(인터넷 등 외부 이미지 금지). 이미지가 오면 card 모드 배경이나 장면 전환에 활용.
+- 사용자가 그림을 만들어 넣으라고 하면 **codex-image 로만** 생성(TopView 이미지 생성 금지). 아래 '그림 생성' 참고.
 - 하단 자막: 굵게 50px, 검은 반투명 둥근 박스, 화면 하단 56px 위, 한 줄(≈22자 이하)씩, 단어 타이밍으로 끊기.
 - 시작: 상단 좌측 태그 pill + 큰 제목(내용 요약으로 직접 지음, 강조어는 주황), 이름이 나오면 좌하단 이름표.
 - 끝: "감사합니다" 큰 글자 + 이름(주황), 마지막 0.6초 페이드아웃.
 - 그래픽 요소: 텍스트 kicker(40 Medium) + 헤드라인(62~70 Black, 핵심어 주황), 번호 팁 카드, 아이콘 행(체크/느낌표), 사람 아이콘(표정), 말풍선, 하트, 화살표, 검색창 타이핑, 브랜드명 pill(로고는 그리지 않음). 각 요소는 해당 단어가 발화되는 시각에 등장(up/left/pop 애니메이션 0.45s), 장면 끝에서 페이드아웃.
 
 ## 절차
-1. **확인**: `ffprobe`로 길이/해상도/fps. 첨부물에 이미지가 없는데 사용자가 '이미지'를 언급했으면 영상만으로 진행하고 마지막에 알린다. 4×4 프레임 시트(`fps=1/5,scale=480:-1,tile=4x4`)로 화면 내용 파악.
+1. **확인**: `ffprobe`로 길이/해상도/fps. 첨부물에 이미지가 없는데 사용자가 '이미지'를 언급했으면 codex-image 로 만들고, 쓸 수 없으면 영상만으로 진행하고 마지막에 알린다. 4×4 프레임 시트(`fps=1/5,scale=480:-1,tile=4x4`)로 화면 내용 파악.
 2. **받아쓰기**: `pip install --break-system-packages faster-whisper`. mp4를 바로 넣으면 PyAV 오류가 나므로 `ffmpeg -ac 1 -ar 16000 voice16k.wav`로 뽑고 `wave`+numpy로 읽어 배열을 전달(soundfile 없음). 모델 `medium`, `language='ko'`, `word_timestamps=True`, `vad_filter=True`, `compute_type='int8'`. 단어 타임스탬프를 json으로 저장.
 3. **스크립트 정리**: 오인식은 문맥으로 교정(예: 'AI가 대화식으로'→'AI와 대화식으로'), 교정한 곳은 마지막에 알린다. 자막 청크(start,end,text) 목록 작성.
 4. **장면 설계**: 의미 단위로 장면을 나누고 각 장면의 kicker/헤드라인/그래픽과 등장 시각(단어 시작 시각)을 정한다. 결론 문장 구간은 full 모드로 큰 제목+밑줄 스윕+요약 pill. 다음 예고가 있으면 NEXT 장면.
@@ -40,6 +41,16 @@ description: "강의·발표 영상(얼굴 촬영 또는 컴퓨터 실습 화면
 - **한 파일**에 섞여 오면: `ffmpeg -vf "select='gt(scene,0.3)',showinfo"`로 컷 지점을 찾고, 각 구간 대표 프레임을 Read로 보고 '얼굴'/'화면' 분류 → 구간별 레이아웃 적용(얼굴 구간은 하우스 스타일, 화면 구간은 화면 우선).
 - 시연 구간 그래픽: "여기 클릭/이렇게 입력" 발화 시각에 맞춰 (a) 해당 영역 줌(crop box를 1.6~2.2배로 ease 이동, 0.6s), (b) 강조 테두리/화살표 콜아웃, (c) 좌상단 단계 표시 "STEP 1 → 2". 좌표는 프레임을 직접 보고 정한다(추정 금지). 화면 글자가 작으면 줌을 우선 사용.
 - 화면 녹화 위에는 그래픽을 과하게 얹지 말고 상단/좌측 여백과 하단 자막만 사용.
+
+## 그림 생성 (codex-image, 요청이 있을 때만)
+- Codex CLI 0.123+ ChatGPT 로그인 필요(`codex login status`). gpt-image-2, TopView 크레딧 없음. 한 장씩, 장당 약 1분:
+```bash
+echo "Generate an image of '<영어 프롬프트>' in landscape 1536x1024 size using the image_gen tool. Do not run any shell commands." | codex exec --sandbox read-only --skip-git-repo-check -
+cp "$(ls -t ~/.codex/generated_images/*/*.png | head -1)" img/01_name.png
+```
+- `--dangerously-bypass-approvals-and-sandbox` 는 쓰지 않는다. 생성이 실패하면 cp 가 이전 그림을 복사하므로 만든 그림은 Read 로 확인한다.
+- 결과는 1536×1024(3:2) → `ImageOps.fit(img, (1920,1080))` 로 가운데를 16:9 로 잘라 card 모드 배경·장면 전환에 쓴다. 프롬프트에 `centered composition, no text, no watermark`, 하우스 스타일 색(남색·주황·청록)에 맞춘다.
+- 전달 답변에 만든 그림 장수와 쓰인 장면을 적는다.
 
 ## bgm.py (Fmaj7–G6–Em7–Am7, 96bpm, 패드+아르페지오+베이스+소프트 드럼)
 ```python
